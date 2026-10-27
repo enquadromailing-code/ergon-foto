@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ergon Foto</title>
+<meta name="theme-color" content="#16212F">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone/apple-touch-icon.png">
+<link rel="icon" href="icone/icona-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--blu:#293C57;--notte:#16212F;--ocra:#C19730;--ocra-s:#8A6914;--crema:#FFF0D9;--carta:#FBF8F2;--ink:#1F2E44;
+--grigio:#5D6878;--linea:#DCD8CE;--rosso:#D0402F;--arancio:#E8892A;--giallo:#E9C53A;--verde:#4AA43F}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:#F3F1EC;color:var(--ink);font-family:'Work Sans',system-ui,sans-serif;font-size:16px}
+header{background:var(--notte);color:#fff;padding:12px 16px 14px;border-left:6px solid var(--blu)}
+.marchio{display:flex;align-items:center;gap:10px}.marchio img{height:34px}
+.marchio b{font-size:24px;font-weight:600;letter-spacing:-.5px}.marchio b i{color:var(--ocra);font-style:normal}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+header .mono{color:var(--ocra);margin-top:4px}
+main{padding:14px 14px 130px}
+.card{background:#fff;border:1px solid var(--linea);border-radius:6px;padding:14px;margin-bottom:12px}
+.card h2{margin:2px 0 4px;font-size:19px;color:var(--blu);font-weight:700}
+.occ{color:var(--ocra-s)}
+.tit{border-left:4px solid var(--ocra);padding-left:8px;font-weight:600;color:var(--blu);margin:18px 0 8px}
+button{font:inherit;border-radius:4px;border:1px solid #C9C3B6;background:#fff;color:var(--blu);padding:11px 14px;font-weight:600}
+button.pri{background:var(--blu);color:#fff;border-color:var(--blu)}button.acc{background:var(--ocra);color:#fff;border-color:var(--ocra)}
+button:disabled{opacity:.45}
+.lista button{display:flex;width:100%;justify-content:space-between;align-items:center;margin-bottom:8px;text-align:left}
+.lista button.sel{border-color:var(--ocra);background:var(--crema)}
+.vuoto{color:var(--grigio);font-size:14px}
+.barra{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--linea);padding:12px 14px 16px;display:flex;gap:10px}
+.barra button{flex:1;padding:16px 10px;font-size:17px}
+.foto{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start}
+.foto img{width:96px;height:96px;object-fit:cover;border-radius:4px;background:var(--carta)}
+.foto input,.foto textarea{width:100%;font:inherit;font-size:15px;border:1px solid #CFC9BC;border-radius:4px;padding:8px}
+.foto textarea{min-height:58px;margin-top:6px}
+.chip{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.chip button{padding:6px 10px;font-size:13px;border-radius:14px}
+.chip button.on[data-v=nessuna]{background:var(--verde);color:#fff;border-color:var(--verde)}
+.chip button.on[data-v=lieve]{background:var(--giallo);border-color:var(--giallo)}
+.chip button.on[data-v=media]{background:var(--arancio);color:#fff;border-color:var(--arancio)}
+.chip button.on[data-v=grave]{background:var(--rosso);color:#fff;border-color:var(--rosso)}
+.stato{font-size:13px;color:var(--grigio);margin-top:6px}.ok{color:var(--verde)}.err{color:var(--rosso)}
+.pill{display:inline-block;background:var(--crema);color:var(--ocra-s);border-radius:12px;padding:3px 10px;font-size:13px}
+#avviso{position:fixed;left:14px;right:14px;bottom:100px;background:var(--notte);color:#fff;padding:12px 14px;border-radius:6px;display:none;font-size:14px}
+.riga{display:flex;gap:8px;align-items:center}
+label.opz{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--grigio);margin-top:8px}
+main{overflow-x:hidden}.card a,summary,.card h2{overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<header>
+  <div class="marchio"><img src="icone/simbolo-bianco.png" alt=""><b>ergon<i>.</i></b></div>
+  <div class="mono">Foto di cantiere · Enquadro</div>
+</header>
+<main id="app"><div class="card vuoto">Caricamento…</div></main>
+<div class="barra" id="barra" style="display:none">
+  <button class="acc" id="bt-scatta">Scatta foto</button><button id="bt-galleria">Galleria</button>
+</div>
+<input type="file" id="in-camera" accept="image/*" capture="environment" hidden>
+<input type="file" id="in-galleria" accept="image/*" multiple hidden>
+<div id="avviso"></div>
+<script>
+"use strict";
+const PAR = (() => { const q = new URLSearchParams(location.search); return { k: q.get("k") || "", c: q.get("cantiere") || "", p: q.get("p") || "", doc: q.get("doc") || "" }; })();
+// pagina pubblicata fuori da script.google.com (es. GitHub Pages): lo script Apps Script è chiamato come servizio,
+// senza i cookie Google, così gli account collegati al telefono non rompono l'indirizzo (errore «/u/0/»)
+const GAS = "https://script.google.com/macros/s/AKfycbw85d0NAHKx9Z6Rb6XwnHUQdfDzaTk9GLLaGASWzMdpb-Ia4DyQ3O7z_Vsr8KfBS2eN/exec";
+const LATO_MAX = 2200;
+const stato = { cantiere: null, cantieri: null, sopralluoghi: null, sopralluogo: null, bozze: [], inviate: [], coda: 0,
+                inInvio: false, errore: "", verifica: null, doc: null };
+const LS = { get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v === null ? d : v; } catch (e) { return d; } },
+             set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+// la chiave resta sul telefono: l'icona sulla Home si apre senza i parametri del link
+if (PAR.k) LS.set("chiave", PAR.k); else PAR.k = LS.get("chiave", "");
+const interna = typeof google !== "undefined" && google.script && google.script.run;
+const srv = (fn, ...a) => interna
+  ? new Promise((ok, ko) => google.script.run.withSuccessHandler(ok)
+      .withFailureHandler(e => ko(new Error((e && e.message) || String(e))))[fn](PAR.k, ...a))
+  : fetch(GAS, { method: "POST", body: JSON.stringify({ k: PAR.k, fn, args: a }) })
+      .catch(() => { throw new Error("Server non raggiungibile: controllare la connessione."); })
+      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(r.errore || "Errore del server"); return r.risultato; });
+const $ = s => document.querySelector(s);
+const e = s => String(s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const due = n => String(n).padStart(2, "0");
+const dataOra = d => `${due(d.getDate())}/${due(d.getMonth() + 1)}/${d.getFullYear()} ${due(d.getHours())}:${due(d.getMinutes())}`;
+const slug = s => (s || "").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 30);
+let timer = null;
+function avviso(t, ms) { const a = $("#avviso"); a.textContent = t; a.style.display = t ? "block" : "none";
+  clearTimeout(timer); if (t && ms) timer = setTimeout(() => avviso(""), ms); }
+
+// coda di invio (sopravvive alla chiusura della pagina)
+const Coda = { db: null, mem: [],
+  async apri() { if (this.db !== null) return this.db;
+    try { this.db = await new Promise((ok, ko) => { const r = indexedDB.open("ergon-foto", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("coda", { keyPath: "id" });
+      r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); }); } catch (x) { this.db = false; }
+    return this.db; },
+  async op(m, fn) { const db = await this.apri(); if (!db) return fn(null);
+    return new Promise((ok, ko) => { const tx = db.transaction("coda", m); const r = fn(tx.objectStore("coda"));
+      tx.oncomplete = () => ok(r && r.result); tx.onerror = () => ko(tx.error); }); },
+  metti(v) { return this.op("readwrite", s => s ? s.put(v) : this.mem.push(v)); },
+  togli(id) { return this.op("readwrite", s => s ? s.delete(id) : (this.mem = this.mem.filter(x => x.id !== id))); },
+  async tutte() { const r = await this.op("readonly", s => s ? s.getAll() : null); return r || this.mem; } };
+
+async function comprimi(file) {
+  let img; try { img = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (x) { img = await createImageBitmap(file); }
+  const s = Math.min(1, LATO_MAX / Math.max(img.width, img.height));
+  const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+function posizione() {
+  if (!LS.get("gps", false) || !navigator.geolocation) return Promise.resolve("");
+  return new Promise(ok => navigator.geolocation.getCurrentPosition(p => ok(`${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`),
+    () => ok(""), { timeout: 6000 }));
+}
+
+async function aggiungiFoto(file, scatto) {
+  avviso(`Preparo ${file.length} foto…`);
+  const gps = await posizione();
+  for (const f of file) {
+    try {
+      const url = await comprimi(f);
+      const q = scatto ? new Date() : new Date(f.lastModified || Date.now());
+      stato.bozze.push({ id: Date.now() + "-" + Math.random().toString(36).slice(2, 7), url, area: LS.get("ultima-area", ""),
+                         nota: "", criticita: "nessuna", scattata: dataOra(q), quando: q.getTime(), gps });
+    } catch (x) { avviso("Foto non leggibile: " + f.name, 4000); }
+  }
+  avviso(""); disegna();
+}
+
+async function inviaBozze() {
+  for (const b of stato.bozze) {
+    const q = new Date(b.quando);
+    await Coda.metti({ id: b.id, url: b.url, cantiere: stato.cantiere, sopralluogo: stato.sopralluogo,
+      nome: `${q.getFullYear()}${due(q.getMonth() + 1)}${due(q.getDate())}_${due(q.getHours())}${due(q.getMinutes())}${due(q.getSeconds())}_${slug(b.area) || "foto"}.jpg`,
+      meta: { area: b.area, nota: b.nota, criticita: b.criticita, scattata: b.scattata, gps: b.gps } });
+    if (b.area) LS.set("ultima-area", b.area);
+  }
+  stato.bozze = []; disegna(); elaboraCoda();
+}
+
+async function elaboraCoda() {
+  if (stato.inInvio) return;
+  stato.inInvio = true;
+  try {
+    const voci = await Coda.tutte(); stato.coda = voci.length; disegna();
+    for (const v of voci) {
+      if (!navigator.onLine) { stato.errore = "Sei offline: le foto restano in coda e partono appena torna la rete."; break; }
+      try {
+        await srv("caricaFoto", v.cantiere, v.sopralluogo, v.nome, v.url.split(",")[1], v.meta);
+        await Coda.togli(v.id); stato.inviate.unshift(v.url); stato.errore = "";
+      } catch (x) { stato.errore = x.message; break; }
+      stato.coda = (await Coda.tutte()).length; disegna();
+    }
+    stato.coda = (await Coda.tutte()).length;
+  } finally { stato.inInvio = false; disegna(); }
+}
+
+async function apriCantiere(nome) {
+  stato.cantiere = nome; LS.set("cantiere", nome); stato.sopralluoghi = null; stato.sopralluogo = null; disegna();
+  try { stato.sopralluoghi = await srv("sopralluoghi", nome);
+        const ult = LS.get("sop-" + nome, ""); stato.sopralluogo = stato.sopralluoghi.includes(ult) ? ult : null; stato.errore = ""; }
+  catch (x) { stato.errore = x.message; }
+  disegna();
+}
+async function nuovoSopralluogo() {
+  const d = new Date();
+  try { const n = await srv("nuovoSopralluogo", stato.cantiere, `${d.getFullYear()}-${due(d.getMonth() + 1)}-${due(d.getDate())} Sopralluogo`);
+        stato.sopralluoghi.unshift(n); scegli(n); } catch (x) { avviso(x.message, 5000); }
+}
+function scegli(n) { stato.sopralluogo = n; LS.set("sop-" + stato.cantiere, n); disegna(); }
+
+// ---------------- pass di cantiere
+async function caricaPass() {
+  const v = stato.verifica;
+  try { const r = await srv("statoPass", v.cantiere, v.pass); v.dati = r; v.errore = ""; } catch (x) { v.errore = x.message; }
+  disegna();
+}
+function semaforo(p) {
+  if (!p) return "rosso";
+  const oggi = new Date().toISOString().slice(0, 10);
+  if (p.esito === "NON AUTORIZZATO" || (p.valido_fino_al && p.valido_fino_al < oggi)) return "rosso";
+  if (p.semaforo === "giallo" || (p.valido_fino_al && (new Date(p.valido_fino_al) - new Date(oggi)) / 864e5 <= 7)) return "giallo";
+  return "verde";
+}
+async function movimento(tipo) {
+  const v = stato.verifica, p = v.dati.pass, s = semaforo(p);
+  if (s === "rosso" && !confirm("Il pass NON è valido. Registrare comunque il movimento?")) return;
+  const o = new Date();
+  const dati = { pass: v.pass, nome: p.nome, impresa: p.impresa, tipo, semaforo: s, esito: p.esito, gps: await posizione(),
+    quando: `${o.getFullYear()}-${due(o.getMonth() + 1)}-${due(o.getDate())}T${due(o.getHours())}:${due(o.getMinutes())}` };
+  try { await srv("registraMovimento", v.cantiere, dati); v.fatto = `${tipo === "ingresso" ? "Ingresso" : "Uscita"} registrato alle ${due(o.getHours())}:${due(o.getMinutes())}`; }
+  catch (x) { avviso(x.message, 6000); }
+  disegna();
+}
+function disegnaVerifica() {
+  const v = stato.verifica; let h = "";
+  if (!v.dati) h = `<div class="card">${v.errore ? `<p class="err">${e(v.errore)}</p>` : "<p class='vuoto'>Verifico il pass…</p>"}</div>`;
+  else {
+    const p = v.dati.pass, s = semaforo(p);
+    const col = { verde: "var(--verde)", giallo: "var(--arancio)", rosso: "var(--rosso)" }[s];
+    const tit = { verde: "ACCESSO CONSENTITO", giallo: "ACCESSO CON RISERVA", rosso: "ACCESSO NEGATO" }[s];
+    h = `<div class="card" style="border-top:10px solid ${col};text-align:center"><div class="mono" style="color:${col};font-size:14px;margin:6px 0">${tit}</div>` +
+      (p ? `<h2 style="font-size:24px">${e(p.nome)}</h2><div>${e(p.impresa)}</div><div class="vuoto">${e(p.mansione)}</div>
+        <p><b>${e(p.esito)}</b>${p.valido_fino_al ? `<br>valido fino al ${p.valido_fino_al.split("-").reverse().join("/")}` : ""}</p>
+        ${(p.motivi || []).length ? `<div style="text-align:left" class="vuoto">${p.motivi.map(m => "• " + e(m)).join("<br>")}</div>` : ""}`
+         : `<h2>Pass non valido</h2><p class="vuoto">Codice assente nello stato degli accessi (pass revocato o di un altro cantiere).</p>`) +
+      `<p class="stato">Stato aggiornato da Ergon il ${e((v.dati.aggiornato || "").replace("T", " "))}</p></div>`;
+    if (p) h += `<div class="riga"><button class="pri" id="bt-ingresso" style="flex:1;padding:16px">Registra ingresso</button>
+      <button id="bt-uscita" style="flex:1;padding:16px">Registra uscita</button></div>${v.fatto ? `<p class="ok" style="text-align:center">${e(v.fatto)}</p>` : ""}`;
+  }
+  h += `<button id="bt-foto" style="width:100%;margin-top:14px">Vai alle foto del cantiere</button>`;
+  $("#app").innerHTML = h; $("#barra").style.display = "none";
+}
+
+// ---------------- documentazione del cantiere
+async function caricaDocumentazione() {
+  try { stato.doc.albero = await srv("documentazione", stato.doc.cantiere); stato.doc.errore = ""; }
+  catch (x) { stato.doc.errore = x.message; }
+  disegna();
+}
+function conta(n) { return n.file.length + n.cartelle.reduce((s, c) => s + conta(c), 0); }
+function nodoHtml(n, filtro, livello) {
+  const file = n.file.filter(f => !filtro || f.nome.toLowerCase().includes(filtro));
+  const sotto = n.cartelle.map(c => nodoHtml(c, filtro, livello + 1)).filter(Boolean);
+  if (filtro && !file.length && !sotto.length) return "";
+  const elenco = file.map(f => `<a href="${e(f.url)}" target="_blank" style="display:block;padding:9px 4px;border-bottom:1px solid var(--linea);color:var(--ink);text-decoration:none">${e(f.nome)}</a>`).join("");
+  if (livello === 0) return elenco + sotto.join("");
+  return `<details ${filtro ? "open" : ""} style="margin:6px 0"><summary style="font-weight:600;color:var(--blu);padding:8px 0">${e(n.nome)} <span class="pill">${conta(n)}</span></summary><div style="padding-left:12px">${elenco}${sotto.join("")}</div></details>`;
+}
+function disegnaDocumentazione() {
+  const d = stato.doc;
+  let h = `<div class="card"><div class="mono occ">Documentazione</div><h2>${e(d.cantiere)}</h2>`;
+  if (d.albero) h += `<input id="cerca-doc" placeholder="Cerca un documento o un lavoratore…" value="${e(d.filtro || "")}" style="width:100%;font:inherit;padding:10px;border:1px solid #CFC9BC;border-radius:4px;margin-top:6px">`;
+  h += `</div>`;
+  if (!d.albero) h += `<div class="card">${d.errore ? `<p class="err">${e(d.errore)}</p>` : "<p class='vuoto'>Carico la documentazione…</p>"}</div>`;
+  else h += `<div class="card">${nodoHtml(d.albero, (d.filtro || "").toLowerCase(), 0) || "<p class='vuoto'>Nessun documento trovato.</p>"}</div>
+    <a href="${e(d.albero.url)}" target="_blank"><button style="width:100%">Apri la cartella in Google Drive</button></a>`;
+  $("#app").innerHTML = h; $("#barra").style.display = "none";
+  const c = $("#cerca-doc");
+  if (c) { c.oninput = () => { d.filtro = c.value; const pos = c.selectionStart; disegnaDocumentazione(); const n = $("#cerca-doc"); n.focus(); n.setSelectionRange(pos, pos); }; }
+}
+
+// ---------------- interfaccia
+function disegna() {
+  if (stato.doc) return disegnaDocumentazione();
+  if (stato.verifica) return disegnaVerifica();
+  const app = $("#app");
+  $("#barra").style.display = stato.sopralluogo ? "flex" : "none";
+  if (!stato.cantiere) {
+    app.innerHTML = `<div class="card"><div class="mono occ">Cantiere</div><h2>Scegli il cantiere</h2>
+      <p class="vuoto">Oppure inquadra il QR del cantiere da Ergon sul PC («Foto dal telefono…»).</p></div>
+      <div class="lista">${stato.cantieri === null ? "<p class='vuoto'>Carico i cantieri…</p>" : stato.cantieri.length
+        ? stato.cantieri.map(c => `<button data-cantiere="${e(c)}">${e(c)}</button>`).join("")
+        : "<p class='vuoto'>Nessun cantiere: in Ergon sul PC usa «Foto dal telefono…».</p>"}</div>`;
+    return;
+  }
+  let h = `<div class="card"><div class="mono occ">Cantiere</div><h2>${e(stato.cantiere)}</h2>
+    <button id="bt-cambia" style="margin-top:6px">Cambia cantiere</button></div>`;
+  if (stato.sopralluoghi === null) h += `<div class="card">${stato.errore ? `<p class="err">${e(stato.errore)}</p>` : "<p class='vuoto'>Carico i sopralluoghi…</p>"}</div>`;
+  else {
+    h += `<div class="tit">Sopralluogo</div><div class="lista">` + stato.sopralluoghi.slice(0, 6).map(s =>
+      `<button data-sop="${e(s)}" class="${stato.sopralluogo === s ? "sel" : ""}">${e(s)}${stato.sopralluogo === s ? "<span class='pill'>scelto</span>" : ""}</button>`).join("") +
+      `<button id="bt-nuovo" class="acc" style="justify-content:center">+ Nuovo sopralluogo di oggi</button></div>`;
+    if (stato.sopralluogo) {
+      if (stato.bozze.length) {
+        h += `<div class="tit">Da inviare (${stato.bozze.length})</div>` + stato.bozze.map(b => `<div class="card foto" data-bozza="${b.id}">
+          <img src="${b.url}" alt=""><div><input placeholder="Area / lavorazione (es. ponteggio lato nord)" value="${e(b.area)}" data-campo="area">
+          <div class="chip">${["nessuna", "lieve", "media", "grave"].map(v => `<button data-v="${v}" class="${b.criticita === v ? "on" : ""}">${v === "nessuna" ? "ok" : v}</button>`).join("")}</div>
+          <textarea placeholder="Nota (puoi dettarla con il microfono della tastiera)" data-campo="nota">${e(b.nota)}</textarea>
+          <div class="riga" style="justify-content:space-between"><span class="stato">${e(b.scattata)}${b.gps ? " · GPS" : ""}</span>
+          <button data-togli="${b.id}" style="padding:6px 10px">Elimina</button></div></div></div>`).join("") +
+          `<button class="pri" id="bt-invia" style="width:100%;padding:16px">Invia ${stato.bozze.length} foto su Drive</button>`;
+      } else h += `<div class="card vuoto">Scatta le foto con il pulsante in basso: per ognuna indica area, criticità e una nota. Ergon le userà per il report fotografico.</div>`;
+      if (stato.coda || stato.errore) h += `<div class="card">${stato.coda ? `<b>${stato.coda}</b> foto in coda${stato.inInvio ? " · invio in corso…" : ""}` : ""}
+        ${stato.errore ? `<p class="err">${e(stato.errore)}</p><button id="bt-riprendi">Riprendi l'invio</button>` : ""}</div>`;
+      if (stato.inviate.length) h += `<div class="tit">Inviate (${stato.inviate.length})</div><div class="card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">` +
+        stato.inviate.slice(0, 24).map(u => `<img src="${u}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:3px" alt="">`).join("") +
+        `</div><p class="stato ok">Le foto sono su Drive: in Ergon, Report fotografico → Da Google Drive.</p>`;
+    }
+    h += `<label class="opz"><input type="checkbox" id="ck-gps" ${LS.get("gps", false) ? "checked" : ""}> Salva la posizione GPS delle foto</label>`;
+  }
+  app.innerHTML = h;
+}
+
+document.addEventListener("click", async ev => {
+  const t = ev.target.closest("button"); if (!t) return;
+  if (t.dataset.cantiere) return apriCantiere(t.dataset.cantiere);
+  if (t.id === "bt-cambia") { stato.cantiere = null; stato.sopralluogo = null; disegna(); if (stato.cantieri === null) caricaCantieri(); return; }
+  if (t.dataset.sop) return scegli(t.dataset.sop);
+  if (t.id === "bt-nuovo") return nuovoSopralluogo();
+  if (t.id === "bt-scatta") return $("#in-camera").click();
+  if (t.id === "bt-galleria") return $("#in-galleria").click();
+  if (t.id === "bt-invia") return inviaBozze();
+  if (t.id === "bt-riprendi") { stato.errore = ""; return elaboraCoda(); }
+  if (t.id === "bt-ingresso" || t.id === "bt-uscita") return movimento(t.id === "bt-ingresso" ? "ingresso" : "uscita");
+  if (t.id === "bt-foto") { const c = stato.verifica.cantiere; stato.verifica = null; return apriCantiere(c); }
+  if (t.dataset.togli) { stato.bozze = stato.bozze.filter(b => b.id !== t.dataset.togli); return disegna(); }
+  if (t.dataset.v) { const b = stato.bozze.find(x => x.id === t.closest("[data-bozza]").dataset.bozza); b.criticita = t.dataset.v; disegna(); }
+});
+document.addEventListener("input", ev => {
+  const card = ev.target.closest("[data-bozza]"); if (!card) return;
+  stato.bozze.find(x => x.id === card.dataset.bozza)[ev.target.dataset.campo] = ev.target.value;
+});
+document.addEventListener("change", ev => {
+  if (ev.target.id === "ck-gps") LS.set("gps", ev.target.checked);
+  if (ev.target.id === "in-camera" || ev.target.id === "in-galleria") {
+    const f = [...ev.target.files]; ev.target.value = ""; if (f.length) aggiungiFoto(f, ev.target.id === "in-camera");
+  }
+});
+window.addEventListener("online", () => elaboraCoda());
+
+async function caricaCantieri() {
+  try { stato.cantieri = await srv("elencoCantieri"); } catch (x) { stato.cantieri = []; avviso(x.message, 5000); }
+  disegna();
+}
+
+(async () => {
+  if (!PAR.k) { $("#app").innerHTML = `<div class="card"><h2>Link non valido</h2><div class="vuoto">Aprire Ergon Foto
+    dal link o dal QR del cantiere creato da Ergon sul PC.</div></div>`; return; }
+  stato.coda = (await Coda.tutte()).length;
+  if (PAR.c && PAR.doc) { stato.doc = { cantiere: PAR.c, albero: null, filtro: "" }; disegna(); caricaDocumentazione(); }
+  else if (PAR.c && PAR.p) { stato.verifica = { cantiere: PAR.c, pass: PAR.p, dati: null }; disegna(); caricaPass(); }
+  else if (PAR.c || LS.get("cantiere", "")) apriCantiere(PAR.c || LS.get("cantiere", ""));
+  else { disegna(); caricaCantieri(); }
+  if (stato.coda) elaboraCoda();
+})();
+</script>
+</body>
+</html>
